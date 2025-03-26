@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chatbot Crèche Pilou</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        header {
+            text-align: center;
+            padding: 20px 0;
+            background-color: #4a90e2;
+            color: white;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        h1 {
+            margin: 0;
+        }
+        .chat-container {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        .chat-messages {
+            height: 400px;
+            overflow-y: auto;
+            padding: 20px;
+            border-bottom: 1px solid #eee;
+        }
+        .message {
+            margin-bottom: 15px;
+            padding: 10px 15px;
+            border-radius: 8px;
+            max-width: 80%;
+        }
+        .user-message {
+            background-color: #4a90e2;
+            color: white;
+            margin-left: auto;
+        }
+        .bot-message {
+            background-color: #e9f0fb;
+            color: #333;
+        }
+        .chat-input {
+            display: flex;
+            padding: 15px;
+        }
+        input {
+            flex: 1;
+            padding: 10px 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        button {
+            background-color: #4a90e2;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin-left: 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #3a80d2;
+        }
+        .loader {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .sources {
+            font-size: 12px;
+            color: #888;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Chatbot Crèche Pilou</h1>
+            <p>Posez vos questions sur la réglementation et le fonctionnement des crèches</p>
+        </header>
+        
+        <div class="chat-container">
+            <div class="chat-messages" id="chat-messages">
+                <div class="message bot-message">
+                    Bonjour ! Je suis le chatbot Crèche Pilou. Je peux répondre à vos questions sur la réglementation et le fonctionnement des crèches. Comment puis-je vous aider aujourd'hui ?
+                </div>
+            </div>
+            
+            <div class="chat-input">
+                <input type="text" id="user-input" placeholder="Posez votre question ici..." autocomplete="off">
+                <button id="send-button">Envoyer</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const chatMessages = document.getElementById('chat-messages');
+            const userInput = document.getElementById('user-input');
+            const sendButton = document.getElementById('send-button');
+            
+            // Fonction pour ajouter un message à la zone de chat
+            function addMessage(message, isUser) {
+                const messageDiv = document.createElement('div');
+                messageDiv.classList.add('message');
+                messageDiv.classList.add(isUser ? 'user-message' : 'bot-message');
+                
+                if (typeof message === 'string') {
+                    messageDiv.textContent = message;
+                } else {
+                    // Si le message est un objet avec answer et sources
+                    messageDiv.textContent = message.answer;
+                    
+                    if (message.sources && message.sources.length > 0) {
+                        const sourcesDiv = document.createElement('div');
+                        sourcesDiv.classList.add('sources');
+                        sourcesDiv.textContent = 'Sources: ' + message.sources.join(', ');
+                        messageDiv.appendChild(sourcesDiv);
+                    }
+                }
+                
+                chatMessages.appendChild(messageDiv);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }
+            
+            // Fonction pour envoyer un message
+            async function sendMessage() {
+                const message = userInput.value.trim();
+                if (!message) return;
+                
+                // Afficher le message de l'utilisateur
+                addMessage(message, true);
+                userInput.value = '';
+                
+                // Afficher un loader pendant le chargement
+                const loadingDiv = document.createElement('div');
+                loadingDiv.classList.add('message', 'bot-message');
+                const loader = document.createElement('div');
+                loader.classList.add('loader');
+                loadingDiv.appendChild(loader);
+                chatMessages.appendChild(loadingDiv);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+                
+                try {
+                    // Appeler l'API
+                    const response = await fetch('/api/chat', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ message })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    // Supprimer le loader
+                    chatMessages.removeChild(loadingDiv);
+                    
+                    // Afficher la réponse du chatbot
+                    addMessage(data, false);
+                } catch (error) {
+                    // Supprimer le loader
+                    chatMessages.removeChild(loadingDiv);
+                    
+                    // Afficher un message d'erreur
+                    addMessage('Désolé, une erreur s\'est produite. Veuillez réessayer.', false);
+                    console.error('Error:', error);
+                }
+            }
+            
+            // Gérer le clic sur le bouton d'envoi
+            sendButton.addEventListener('click', sendMessage);
+            
+            // Gérer l'appui sur Entrée dans le champ de texte
+            userInput.addEventListener('keypress', (event) => {
+                if (event.key === 'Enter') {
+                    sendMessage();
+                }
+            });
+            
+            // Focus sur le champ de texte au chargement de la page
+            userInput.focus();
+        });
+    </script>
+</body>
+</html>
