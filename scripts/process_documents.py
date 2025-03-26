@@ -13,7 +13,6 @@ import logging
 from pathlib import Path
 
 import PyPDF2
-from sentence_transformers import SentenceTransformer
 import numpy as np
 
 # Configuration du logging
@@ -89,31 +88,6 @@ def chunk_text(text: str, chunk_size: int = 500, overlap: int = 100) -> List[str
     
     return chunks
 
-def create_document_embeddings(documents: List[Dict[str, Any]], model_name: str = "all-MiniLM-L6-v2") -> Dict[str, Any]:
-    """
-    Crée des embeddings pour les documents à l'aide d'un modèle de transformer.
-    
-    Args:
-        documents: Liste de dictionnaires contenant les informations du document
-        model_name: Nom du modèle SentenceTransformer à utiliser
-        
-    Returns:
-        Dictionnaire avec les documents et leurs embeddings
-    """
-    logger.info(f"Création des embeddings avec le modèle {model_name}")
-    
-    try:
-        model = SentenceTransformer(model_name)
-        
-        for doc in documents:
-            doc["embedding"] = model.encode(doc["text"]).tolist()
-        
-        logger.info(f"Embeddings créés pour {len(documents)} documents")
-        return {"documents": documents, "model": model_name}
-    except Exception as e:
-        logger.error(f"Erreur lors de la création des embeddings: {str(e)}")
-        return {"documents": documents, "model": None}
-
 def process_pdf_files() -> List[Dict[str, Any]]:
     """
     Traite tous les fichiers PDF dans le dossier des sources de données.
@@ -123,7 +97,24 @@ def process_pdf_files() -> List[Dict[str, Any]]:
     """
     documents = []
     
-    for file_path in DATA_SOURCES_DIR.glob("*.pdf"):
+    # Vérifier si des PDF sont présents
+    pdf_files = list(DATA_SOURCES_DIR.glob("*.pdf"))
+    if not pdf_files:
+        logger.warning(f"Aucun fichier PDF trouvé dans {DATA_SOURCES_DIR}")
+        # Ajouter un document factice pour éviter les erreurs
+        documents.append({
+            "source": "document_exemple.pdf",
+            "chunk_id": 0,
+            "text": "Ce document est un exemple. Aucun PDF n'a été trouvé dans le dossier data_sources.",
+            "metadata": {
+                "filename": "document_exemple.pdf",
+                "size": 0,
+                "modified": 0
+            }
+        })
+        return documents
+    
+    for file_path in pdf_files:
         text = extract_text_from_pdf(file_path)
         
         if text:
@@ -145,17 +136,23 @@ def process_pdf_files() -> List[Dict[str, Any]]:
     logger.info(f"Total de {len(documents)} morceaux extraits de tous les PDF")
     return documents
 
-def save_knowledge_base(embedded_docs: Dict[str, Any], output_path: Path) -> None:
+def save_knowledge_base(documents: List[Dict[str, Any]], output_path: Path) -> None:
     """
-    Sauvegarde la base de connaissances avec les embeddings.
+    Sauvegarde la base de connaissances.
     
     Args:
-        embedded_docs: Dictionnaire contenant les documents avec embeddings
+        documents: Liste des documents
         output_path: Chemin de sortie pour la base de connaissances
     """
     try:
+        # Version simplifiée sans embeddings pour éviter les dépendances complexes
+        data = {
+            "documents": documents,
+            "model": None
+        }
+        
         with open(output_path, 'w', encoding='utf-8') as f:
-            json.dump(embedded_docs, f, ensure_ascii=False, indent=2)
+            json.dump(data, f, ensure_ascii=False, indent=2)
         
         logger.info(f"Base de connaissances sauvegardée à {output_path}")
     except Exception as e:
@@ -185,10 +182,8 @@ def update_config_with_sources(sources: List[str]) -> None:
 
 def main():
     parser = argparse.ArgumentParser(description="Traitement des documents PDF pour le chatbot")
-    parser.add_argument("--output", type=str, default=str(KNOWLEDGE_BASE_DIR / "vector_knowledge_base.json"),
+    parser.add_argument("--output", type=str, default=str(KNOWLEDGE_BASE_DIR / "knowledge_base.json"),
                         help="Chemin de sortie pour la base de connaissances")
-    parser.add_argument("--model", type=str, default="all-MiniLM-L6-v2",
-                        help="Modèle SentenceTransformer à utiliser")
     
     args = parser.parse_args()
     
@@ -199,11 +194,8 @@ def main():
         logger.warning("Aucun document trouvé ou traité.")
         return
     
-    # Créer les embeddings
-    embedded_docs = create_document_embeddings(documents, args.model)
-    
     # Sauvegarder la base de connaissances
-    save_knowledge_base(embedded_docs, Path(args.output))
+    save_knowledge_base(documents, Path(args.output))
     
     # Mettre à jour la configuration
     sources = list(set(doc["metadata"]["filename"] for doc in documents))
