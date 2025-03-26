@@ -1,0 +1,12 @@
+aws_region               = "eu-west-3"
+project_name             = "creche-pilou-chatbot"
+environment              = "dev"
+lambda_package_path      = "../dist/lambda_function.zip"
+anthropic_api_key        = "sk-ant-xxx" # À remplacer par votre clé API Anthropic
+claude_model             = "claude-3-opus-20240229"
+max_tokens               = 1000
+cors_allowed_origins     = ["*"]
+enable_vector_search     = true # Mettre à true pour utiliser OpenSearch
+opensearch_instance_type = "t3.small.search"
+opensearch_master_user   = "admin"
+opensearch_master_password = "ChangeMe!" # À remplacer par un mot de passe sécurisé
