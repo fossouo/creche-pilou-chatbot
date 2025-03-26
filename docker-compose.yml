@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  chatbot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./data_sources:/app/data_sources
+      - ./config:/app/config
+      - ./knowledge_base:/app/knowledge_base
+    env_file:
+      - .env.local
+    restart: unless-stopped
+    
+  vector-db:
+    image: opensearchproject/opensearch:2.5.0
+    environment:
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m"
+      - DISABLE_SECURITY_PLUGIN=true
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    volumes:
+      - opensearch-data:/usr/share/opensearch/data
+    ports:
+      - "9200:9200"
+      - "9600:9600"
+    restart: unless-stopped
+
+volumes:
+  opensearch-data:
