@@ -8,6 +8,8 @@ mettre à jour la base de connaissances du chatbot.
 import os
 import json
 import argparse
+import unicodedata
+import re
 from typing import List, Dict, Any
 import logging
 from pathlib import Path
@@ -32,6 +34,22 @@ CONFIG_DIR = PROJECT_ROOT / "config"
 KNOWLEDGE_BASE_DIR.mkdir(exist_ok=True)
 CONFIG_DIR.mkdir(exist_ok=True)
 
+def normalize_filename(filename: str) -> str:
+    """
+    Normalise un nom de fichier en supprimant les accents et en remplaçant les espaces.
+    
+    Args:
+        filename: Nom de fichier à normaliser
+        
+    Returns:
+        Nom de fichier normalisé
+    """
+    # Supprimer les accents
+    filename = unicodedata.normalize('NFKD', filename).encode('ASCII', 'ignore').decode('ASCII')
+    # Remplacer les espaces et caractères spéciaux par des underscores
+    filename = re.sub(r'[^\w\.\-]', '_', filename)
+    return filename
+
 def extract_text_from_pdf(pdf_path: Path) -> str:
     """
     Extrait le texte d'un fichier PDF.
@@ -51,7 +69,9 @@ def extract_text_from_pdf(pdf_path: Path) -> str:
             
             for page_num in range(len(reader.pages)):
                 page = reader.pages[page_num]
-                text += page.extract_text()
+                page_text = page.extract_text()
+                if page_text:
+                    text += page_text + "\n\n"
             
             logger.info(f"Extraction réussie: {len(text)} caractères extraits")
             return text
@@ -114,45 +134,77 @@ def process_pdf_files() -> List[Dict[str, Any]]:
         })
         return documents
     
+    logger.info(f"Traitement de {len(pdf_files)} fichiers PDF trouvés")
+    
     for file_path in pdf_files:
-        text = extract_text_from_pdf(file_path)
-        
-        if text:
-            chunks = chunk_text(text)
+        try:
+            logger.info(f"Traitement du fichier: {file_path.name}")
+            text = extract_text_from_pdf(file_path)
             
-            for i, chunk in enumerate(chunks):
-                doc = {
-                    "source": file_path.name,
-                    "chunk_id": i,
-                    "text": chunk,
-                    "metadata": {
-                        "filename": file_path.name,
-                        "size": os.path.getsize(file_path),
-                        "modified": os.path.getmtime(file_path)
+            if text:
+                chunks = chunk_text(text)
+                logger.info(f"Fichier {file_path.name} divisé en {len(chunks)} morceaux")
+                
+                for i, chunk in enumerate(chunks):
+                    doc = {
+                        "source": file_path.name,
+                        "chunk_id": i,
+                        "text": chunk,
+                        "metadata": {
+                            "filename": file_path.name,
+                            "size": os.path.getsize(file_path),
+                            "modified": os.path.getmtime(file_path)
+                        }
                     }
-                }
-                documents.append(doc)
+                    documents.append(doc)
+            else:
+                logger.warning(f"Aucun texte extrait du fichier {file_path.name}")
+        except Exception as e:
+            logger.error(f"Erreur lors du traitement du fichier {file_path.name}: {str(e)}")
     
     logger.info(f"Total de {len(documents)} morceaux extraits de tous les PDF")
     return documents
 
-def save_knowledge_base(documents: List[Dict[str, Any]], output_path: Path) -> None:
+def create_document_embeddings(documents: List[Dict[str, Any]], model_name: str = "all-MiniLM-L6-v2") -> Dict[str, Any]:
     """
-    Sauvegarde la base de connaissances.
+    Crée des embeddings pour les documents à l'aide d'un modèle de transformer.
     
     Args:
-        documents: Liste des documents
+        documents: Liste de dictionnaires contenant les informations du document
+        model_name: Nom du modèle SentenceTransformer à utiliser
+        
+    Returns:
+        Dictionnaire avec les documents et leurs embeddings
+    """
+    logger.info(f"Création des embeddings avec le modèle {model_name}")
+    
+    try:
+        # Import ici pour éviter les problèmes de dépendances si le module n'est pas disponible
+        from sentence_transformers import SentenceTransformer
+        
+        model = SentenceTransformer(model_name)
+        
+        for doc in documents:
+            doc["embedding"] = model.encode(doc["text"]).tolist()
+        
+        logger.info(f"Embeddings créés pour {len(documents)} documents")
+        return {"documents": documents, "model": model_name}
+    except Exception as e:
+        logger.error(f"Erreur lors de la création des embeddings: {str(e)}")
+        # En cas d'erreur, retourner les documents sans embeddings
+        return {"documents": documents, "model": None}
+
+def save_knowledge_base(embedded_docs: Dict[str, Any], output_path: Path) -> None:
+    """
+    Sauvegarde la base de connaissances avec les embeddings.
+    
+    Args:
+        embedded_docs: Dictionnaire contenant les documents avec embeddings
         output_path: Chemin de sortie pour la base de connaissances
     """
     try:
-        # Version simplifiée sans embeddings pour éviter les dépendances complexes
-        data = {
-            "documents": documents,
-            "model": None
-        }
-        
         with open(output_path, 'w', encoding='utf-8') as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
+            json.dump(embedded_docs, f, ensure_ascii=False, indent=2)
         
         logger.info(f"Base de connaissances sauvegardée à {output_path}")
     except Exception as e:
@@ -182,8 +234,10 @@ def update_config_with_sources(sources: List[str]) -> None:
 
 def main():
     parser = argparse.ArgumentParser(description="Traitement des documents PDF pour le chatbot")
-    parser.add_argument("--output", type=str, default=str(KNOWLEDGE_BASE_DIR / "knowledge_base.json"),
+    parser.add_argument("--output", type=str, default=str(KNOWLEDGE_BASE_DIR / "vector_knowledge_base.json"),
                         help="Chemin de sortie pour la base de connaissances")
+    parser.add_argument("--model", type=str, default="all-MiniLM-L6-v2",
+                        help="Modèle SentenceTransformer à utiliser")
     
     args = parser.parse_args()
     
@@ -194,8 +248,11 @@ def main():
         logger.warning("Aucun document trouvé ou traité.")
         return
     
+    # Créer les embeddings
+    embedded_docs = create_document_embeddings(documents, args.model)
+    
     # Sauvegarder la base de connaissances
-    save_knowledge_base(documents, Path(args.output))
+    save_knowledge_base(embedded_docs, Path(args.output))
     
     # Mettre à jour la configuration
     sources = list(set(doc["metadata"]["filename"] for doc in documents))
