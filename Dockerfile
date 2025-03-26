@@ -19,7 +19,8 @@ COPY app.py .
 COPY config/ config/
 COPY scripts/ scripts/
 COPY templates/ templates/
-COPY static/ static/
+# Au lieu de copier le dossier static, nous l'avons déjà créé ci-dessus
+# COPY static/ static/
 COPY data_sources/ data_sources/
 
 # Exposer le port sur lequel l'application s'exécutera
@@ -31,7 +32,7 @@ ENV FLASK_ENV=production
 ENV ANTHROPIC_API_KEY=""
 ENV CLAUDE_MODEL="claude-3-opus-20240229"
 ENV MAX_TOKENS=1000
-ENV VECTOR_SEARCH_ENABLED=true
+ENV VECTOR_SEARCH_ENABLED=false
 
 # Exécuter l'application au démarrage
 # Au lieu de traiter les documents au build time, nous le ferons au runtime
