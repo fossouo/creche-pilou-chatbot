@@ -10,6 +10,7 @@ import json
 import argparse
 import unicodedata
 import re
+import hashlib
 from typing import List, Dict, Any
 import logging
 from pathlib import Path
@@ -50,6 +51,22 @@ def normalize_filename(filename: str) -> str:
     filename = re.sub(r'[^\w\.\-]', '_', filename)
     return filename
 
+def get_file_hash(file_path: Path) -> str:
+    """
+    Génère un hash pour le fichier.
+    
+    Args:
+        file_path: Chemin vers le fichier
+        
+    Returns:
+        Hash du fichier
+    """
+    hash_md5 = hashlib.md5()
+    with open(file_path, "rb") as f:
+        for chunk in iter(lambda: f.read(4096), b""):
+            hash_md5.update(chunk)
+    return hash_md5.hexdigest()
+
 def extract_text_from_pdf(pdf_path: Path) -> str:
     """
     Extrait le texte d'un fichier PDF.
@@ -67,12 +84,23 @@ def extract_text_from_pdf(pdf_path: Path) -> str:
             reader = PyPDF2.PdfReader(file)
             text = ""
             
-            for page_num in range(len(reader.pages)):
-                page = reader.pages[page_num]
-                page_text = page.extract_text()
-                if page_text:
-                    text += page_text + "\n\n"
+            total_pages = len(reader.pages)
+            logger.info(f"Nombre total de pages: {total_pages}")
             
+            for page_num in range(total_pages):
+                try:
+                    page = reader.pages[page_num]
+                    page_text = page.extract_text()
+                    if page_text:
+                        text += page_text + "\n\n"
+                    logger.debug(f"Page {page_num+1}/{total_pages} traitée: {len(page_text)} caractères")
+                except Exception as e:
+                    logger.error(f"Erreur lors de l'extraction de la page {page_num+1}: {str(e)}")
+            
+            if not text.strip():
+                logger.warning(f"Aucun texte extrait de {pdf_path}")
+                return ""
+                
             logger.info(f"Extraction réussie: {len(text)} caractères extraits")
             return text
     except Exception as e:
@@ -108,62 +136,59 @@ def chunk_text(text: str, chunk_size: int = 500, overlap: int = 100) -> List[str
     
     return chunks
 
-def process_pdf_files() -> List[Dict[str, Any]]:
+def process_single_pdf(pdf_path: Path) -> List[Dict[str, Any]]:
     """
-    Traite tous les fichiers PDF dans le dossier des sources de données.
+    Traite un seul fichier PDF.
     
+    Args:
+        pdf_path: Chemin vers le fichier PDF
+        
     Returns:
-        Liste de dictionnaires contenant les informations des documents traités
+        Liste de dictionnaires contenant les informations du document
     """
     documents = []
+    original_filename = pdf_path.name
+    file_hash = get_file_hash(pdf_path)
     
-    # Vérifier si des PDF sont présents
-    pdf_files = list(DATA_SOURCES_DIR.glob("*.pdf"))
-    if not pdf_files:
-        logger.warning(f"Aucun fichier PDF trouvé dans {DATA_SOURCES_DIR}")
-        # Ajouter un document factice pour éviter les erreurs
-        documents.append({
-            "source": "document_exemple.pdf",
-            "chunk_id": 0,
-            "text": "Ce document est un exemple. Aucun PDF n'a été trouvé dans le dossier data_sources.",
-            "metadata": {
-                "filename": "document_exemple.pdf",
-                "size": 0,
-                "modified": 0
+    try:
+        logger.info(f"Traitement du fichier: {original_filename} (hash: {file_hash})")
+        
+        # Vérifier si ce fichier a déjà été traité
+        kb_path = KNOWLEDGE_BASE_DIR / f"kb_{file_hash}.json"
+        if kb_path.exists():
+            logger.info(f"Fichier déjà traité précédemment, chargement depuis {kb_path}")
+            with open(kb_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                return data.get("documents", [])
+        
+        text = extract_text_from_pdf(pdf_path)
+        
+        if not text:
+            logger.warning(f"Aucun texte extrait du fichier {original_filename}")
+            return []
+        
+        chunks = chunk_text(text)
+        logger.info(f"Fichier {original_filename} divisé en {len(chunks)} morceaux")
+        
+        for i, chunk in enumerate(chunks):
+            doc = {
+                "source": original_filename,
+                "chunk_id": i,
+                "text": chunk,
+                "file_hash": file_hash,
+                "metadata": {
+                    "filename": original_filename,
+                    "size": os.path.getsize(pdf_path),
+                    "modified": os.path.getmtime(pdf_path)
+                }
             }
-        })
+            documents.append(doc)
+        
+        logger.info(f"Traitement du fichier {original_filename} terminé avec succès")
         return documents
-    
-    logger.info(f"Traitement de {len(pdf_files)} fichiers PDF trouvés")
-    
-    for file_path in pdf_files:
-        try:
-            logger.info(f"Traitement du fichier: {file_path.name}")
-            text = extract_text_from_pdf(file_path)
-            
-            if text:
-                chunks = chunk_text(text)
-                logger.info(f"Fichier {file_path.name} divisé en {len(chunks)} morceaux")
-                
-                for i, chunk in enumerate(chunks):
-                    doc = {
-                        "source": file_path.name,
-                        "chunk_id": i,
-                        "text": chunk,
-                        "metadata": {
-                            "filename": file_path.name,
-                            "size": os.path.getsize(file_path),
-                            "modified": os.path.getmtime(file_path)
-                        }
-                    }
-                    documents.append(doc)
-            else:
-                logger.warning(f"Aucun texte extrait du fichier {file_path.name}")
-        except Exception as e:
-            logger.error(f"Erreur lors du traitement du fichier {file_path.name}: {str(e)}")
-    
-    logger.info(f"Total de {len(documents)} morceaux extraits de tous les PDF")
-    return documents
+    except Exception as e:
+        logger.error(f"Erreur lors du traitement du fichier {original_filename}: {str(e)}")
+        return []
 
 def create_document_embeddings(documents: List[Dict[str, Any]], model_name: str = "all-MiniLM-L6-v2") -> Dict[str, Any]:
     """
@@ -176,7 +201,11 @@ def create_document_embeddings(documents: List[Dict[str, Any]], model_name: str 
     Returns:
         Dictionnaire avec les documents et leurs embeddings
     """
-    logger.info(f"Création des embeddings avec le modèle {model_name}")
+    if not documents:
+        logger.warning("Aucun document à encoder")
+        return {"documents": [], "model": None}
+    
+    logger.info(f"Création des embeddings avec le modèle {model_name} pour {len(documents)} documents")
     
     try:
         # Import ici pour éviter les problèmes de dépendances si le module n'est pas disponible
@@ -210,6 +239,40 @@ def save_knowledge_base(embedded_docs: Dict[str, Any], output_path: Path) -> Non
     except Exception as e:
         logger.error(f"Erreur lors de la sauvegarde de la base de connaissances: {str(e)}")
 
+def merge_knowledge_bases() -> Dict[str, Any]:
+    """
+    Fusionne toutes les bases de connaissances individuelles en une seule.
+    
+    Returns:
+        Base de connaissances fusionnée
+    """
+    logger.info("Fusion des bases de connaissances individuelles")
+    
+    all_documents = []
+    model_name = None
+    
+    # Trouver tous les fichiers de base de connaissances
+    kb_files = list(KNOWLEDGE_BASE_DIR.glob("kb_*.json"))
+    logger.info(f"Nombre de bases de connaissances trouvées: {len(kb_files)}")
+    
+    if not kb_files:
+        logger.warning("Aucune base de connaissances individuelle trouvée")
+        return {"documents": [], "model": None}
+    
+    # Fusionner les documents
+    for kb_file in kb_files:
+        try:
+            with open(kb_file, 'r', encoding='utf-8') as f:
+                kb_data = json.load(f)
+                all_documents.extend(kb_data.get("documents", []))
+                if not model_name and kb_data.get("model"):
+                    model_name = kb_data.get("model")
+        except Exception as e:
+            logger.error(f"Erreur lors de la lecture de {kb_file}: {str(e)}")
+    
+    logger.info(f"Fusion terminée, {len(all_documents)} documents au total")
+    return {"documents": all_documents, "model": model_name}
+
 def update_config_with_sources(sources: List[str]) -> None:
     """
     Met à jour le fichier de configuration avec la liste des sources.
@@ -222,7 +285,8 @@ def update_config_with_sources(sources: List[str]) -> None:
     try:
         config = {
             "sources": sources,
-            "last_updated": os.path.getmtime(config_path) if config_path.exists() else None
+            "last_updated": os.path.getmtime(config_path) if config_path.exists() else None,
+            "total_files": len(sources)
         }
         
         with open(config_path, 'w', encoding='utf-8') as f:
@@ -241,22 +305,39 @@ def main():
     
     args = parser.parse_args()
     
-    # Traiter les fichiers PDF
-    documents = process_pdf_files()
-    
-    if not documents:
-        logger.warning("Aucun document trouvé ou traité.")
+    # Liste des fichiers PDF
+    pdf_files = list(DATA_SOURCES_DIR.glob("*.pdf"))
+    if not pdf_files:
+        logger.warning(f"Aucun fichier PDF trouvé dans {DATA_SOURCES_DIR}")
         return
     
-    # Créer les embeddings
-    embedded_docs = create_document_embeddings(documents, args.model)
+    logger.info(f"Nombre de fichiers PDF trouvés: {len(pdf_files)}")
     
-    # Sauvegarder la base de connaissances
-    save_knowledge_base(embedded_docs, Path(args.output))
+    # Traiter chaque PDF individuellement
+    all_sources = []
+    for pdf_path in pdf_files:
+        documents = process_single_pdf(pdf_path)
+        if documents:
+            # Créer les embeddings
+            file_hash = documents[0].get("file_hash", "unknown")
+            embedded_docs = create_document_embeddings(documents, args.model)
+            
+            # Sauvegarder la base de connaissances individuelle
+            kb_path = KNOWLEDGE_BASE_DIR / f"kb_{file_hash}.json"
+            save_knowledge_base(embedded_docs, kb_path)
+            
+            all_sources.append(pdf_path.name)
+    
+    # Fusionner les bases de connaissances individuelles
+    merged_kb = merge_knowledge_bases()
+    
+    # Sauvegarder la base de connaissances fusionnée
+    save_knowledge_base(merged_kb, Path(args.output))
     
     # Mettre à jour la configuration
-    sources = list(set(doc["metadata"]["filename"] for doc in documents))
-    update_config_with_sources(sources)
+    update_config_with_sources(all_sources)
+    
+    logger.info(f"Traitement terminé: {len(all_sources)}/{len(pdf_files)} fichiers traités avec succès")
 
 if __name__ == "__main__":
     main()
