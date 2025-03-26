@@ -1,0 +1,106 @@
+{
+  "categories": [
+    {
+      "name": "Général",
+      "questions": [
+        {
+          "question": "Qu'est-ce que la Crèche Pilou ?",
+          "answer": "Crèche Pilou est un groupe de structures privées fondé par Sandrine FOSSOUO PACHONG qui en assure également la gestion. Les crèches et micro-crèches sont soit financées par les parents uniquement, soit co-financées par les parents et leur entreprise."
+        },
+        {
+          "question": "Comment contacter le siège de Crèche Pilou ?",
+          "answer": "Le siège de Crèche Pilou est situé au 11Bis Avenue Émile Baudot, 91300 Massy. Il est joignable par téléphone au 09 70 70 89 79 ou par mail à contact@crechepilou.fr."
+        },
+        {
+          "question": "Quels sont les types d'accueil proposés ?",
+          "answer": "Crèche Pilou propose trois types d'accueil : l'accueil régulier (1 à 5 jours par semaine avec contrat), l'accueil occasionnel (ponctuel, sans engagement) et l'accueil d'urgence (exceptionnel sur une période déterminée)."
+        }
+      ]
+    },
+    {
+      "name": "Inscription et Admission",
+      "questions": [
+        {
+          "question": "Comment faire une pré-inscription ?",
+          "answer": "Après le 1er trimestre de grossesse, vous pouvez faire une pré-inscription sur le site internet https://www.crechepilou.fr/Inscription. Il est recommandé de simuler votre tarif avant la pré-inscription sur https://www.crechepilou.fr/Tarifs/Simuler-mon-tarif. Seuls les dossiers complets sont traités."
+        },
+        {
+          "question": "Comment se passe l'attribution des places ?",
+          "answer": "La commission d'attribution débute au 1er trimestre de chaque année pour attribuer les places disponibles. Cette commission tient compte de la date de la demande, de l'âge de l'enfant, du rythme demandé et de la situation sociale des parents. La flexibilité sur les jours d'accueil augmente les chances d'obtenir une place."
+        },
+        {
+          "question": "Quels documents faut-il fournir pour l'inscription définitive ?",
+          "answer": "Pour l'inscription définitive, vous devez fournir : un justificatif de domicile récent, un extrait d'acte de naissance ou livret de famille, le dernier avis d'imposition, un RIB, le certificat d'aptitude à la vie en collectivité, les vaccinations à jour, une ordonnance pour l'administration du paracétamol, l'attestation d'assurance maladie, une pièce d'identité, un justificatif CAF et une attestation d'assurance responsabilité civile."
+        }
+      ]
+    },
+    {
+      "name": "Fonctionnement et Règles",
+      "questions": [
+        {
+          "question": "Quels sont les horaires d'ouverture ?",
+          "answer": "Les établissements sont ouverts de 8h à 18h30. L'arrivée le matin est possible jusqu'à 10h00 et le départ peut se faire à partir de 16h00."
+        },
+        {
+          "question": "Comment se passent les temps de transmission ?",
+          "answer": "Les temps de transmission sont des moments d'échange entre parents et professionnels sur la journée de l'enfant. Ils sont inclus dans le temps de présence de l'enfant. Les parents doivent prévoir 10 minutes de transmission à l'arrivée et au départ."
+        },
+        {
+          "question": "Que faire en cas de retard ?",
+          "answer": "En cas de retard, il est important de prévenir la crèche. Les retards répétés peuvent entraîner un refus d'accueil ou une facturation supplémentaire (10€/heure applicable dès 10 minutes de retard)."
+        }
+      ]
+    },
+    {
+      "name": "Santé et Sécurité",
+      "questions": [
+        {
+          "question": "Quelles sont les règles concernant les vaccinations ?",
+          "answer": "L'enfant ne peut être accepté dans la structure que si les vaccins obligatoires sont effectués selon le calendrier vaccinal en vigueur. Les parents doivent régulièrement fournir les nouvelles attestations vaccinales du carnet de santé."
+        },
+        {
+          "question": "Comment se passe l'administration de médicaments ?",
+          "answer": "Il est demandé aux parents de répartir la prise de médicaments en dehors des horaires de présence à la crèche. En cas de nécessité, le personnel peut administrer un traitement sur ordonnance en cours du médecin (hors homéopathie) avec l'accord écrit de la famille."
+        },
+        {
+          "question": "Que se passe-t-il si mon enfant est malade ?",
+          "answer": "En cas de maladie contagieuse, la nature de la maladie doit être immédiatement signalée. Le personnel décidera d'accueillir ou non l'enfant selon son état de santé. En cas de fièvre ou symptômes inhabituels durant la journée, les parents sont prévenus pour prendre les dispositions nécessaires."
+        }
+      ]
+    },
+    {
+      "name": "Tarifs et Facturation",
+      "questions": [
+        {
+          "question": "Comment sont calculés les tarifs ?",
+          "answer": "Les tarifs sont calculés selon plusieurs critères : le besoin d'accueil, les ressources de la famille, la composition du foyer, la date de la demande, le taux de remplissage de la structure, le statut de la famille et le nombre de fratries accueillies."
+        },
+        {
+          "question": "Quelles sont les aides financières disponibles ?",
+          "answer": "Les familles peuvent bénéficier de l'aide CMG (Complément libre choix du mode de garde) versée par la CAF et d'un crédit d'impôt représentant 50% des sommes versées dans la limite de 3 500 € par enfant gardé (soit 1 750 € maximum)."
+        },
+        {
+          "question": "Comment fonctionne la facturation en cas d'absence ?",
+          "answer": "La place étant réservée pour l'enfant, l'accueil sera facturé même en cas d'absence pour maladie ou congés. Les fermetures annuelles de la crèche sont déjà prises en compte et déduites de la facturation."
+        }
+      ]
+    },
+    {
+      "name": "Vie Quotidienne",
+      "questions": [
+        {
+          "question": "Comment se déroule la période d'adaptation ?",
+          "answer": "La période d'adaptation est obligatoire et peut durer de 2 à 5 jours selon les besoins de l'enfant. Elle permet à l'enfant de se familiariser progressivement avec son nouvel environnement en présence d'un parent, puis de façon de plus en plus autonome."
+        },
+        {
+          "question": "Que faut-il apporter pour mon enfant ?",
+          "answer": "Il faut prévoir des vêtements de rechange adaptés à la saison et à la taille de l'enfant, confortables et marqués au nom de l'enfant. La crèche fournit les draps, serviettes, gants de toilette, bavoirs, couches et produits d'hygiène."
+        },
+        {
+          "question": "Comment sont organisés les repas ?",
+          "answer": "Le déjeuner et le goûter sont servis au sein de la crèche. Les repas sont cuisinés à partir de produits bio, frais et locaux par un prestataire spécialisé en restauration petite enfance. Un lait 1er et 2ème âge est fourni, mais les parents peuvent apporter leur lait spécifique si nécessaire."
+        }
+      ]
+    }
+  ]
+}
