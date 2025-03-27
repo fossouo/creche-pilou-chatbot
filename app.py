@@ -96,7 +96,84 @@ def search_local_knowledge(query: str, top_k: int = 3) -> List[Dict[str, Any]]:
         logger.error(f"Erreur lors de la recherche locale: {str(e)}")
         return []
 
-def query_anthropic(query: str, context: str) -> Dict[str, Any]:
+def get_profile_instructions(profile: str, detail_level: str = "moyen") -> str:
+    """
+    Génère les instructions spécifiques au profil utilisateur.
+    
+    Args:
+        profile: Profil de l'utilisateur (cap, directrice, gestionnaire, coordinatrice)
+        detail_level: Niveau de détail souhaité (bas, moyen, haut)
+    
+    Returns:
+        Instructions pour adapter la réponse au profil
+    """
+    # Instructions communes
+    common_instructions = """
+- Utilise un ton professionnel mais chaleureux.
+- Structure ta réponse avec des paragraphes courts et clairs.
+- Lorsque tu cites la réglementation, sois précis sur les articles et références.
+    """
+    
+    # Instructions spécifiques par profil
+    profile_instructions = {
+        "cap": f"""Tu t'adresses à un(e) professionnel(le) CAP Petite Enfance qui travaille directement avec les enfants.
+- Utilise un langage simple et accessible, évite le jargon technique.
+- Focalise-toi sur les aspects pratiques et concrets du quotidien en crèche.
+- Mets en avant les consignes de sécurité et les bonnes pratiques.
+- Ne mentionne pas les références légales en détail, sauf si explicitement demandé.
+- Propose des exemples concrets qui aident à comprendre l'application des règles.
+- Explique l'essentiel sans entrer dans les complexités administratives.
+        """,
+        
+        "directrice": f"""Tu t'adresses à une directrice de crèche (EJE ou Auxiliaire de puériculture avec responsabilité de direction).
+- Fournis des informations complètes et précises avec les références réglementaires.
+- Mets en avant les responsabilités légales et administratives.
+- Explique les implications pratiques pour l'organisation de la structure.
+- Donne des conseils sur la façon d'assurer la conformité réglementaire.
+- Inclus les nuances et exceptions qui peuvent s'appliquer.
+- N'hésite pas à citer les textes officiels et à donner des références précises.
+        """,
+        
+        "gestionnaire": f"""Tu t'adresses à un(e) gestionnaire de réseau de micro-crèches qui s'occupe des aspects administratifs et financiers.
+- Niveau de détail: {detail_level.upper()}.
+{'- Fournis uniquement les informations essentielles et synthétiques.' if detail_level == 'bas' else ''}
+{'- Offre un équilibre entre informations clés et contexte explicatif.' if detail_level == 'moyen' else ''}
+{'- Fournis une analyse approfondie avec toutes les nuances et références.' if detail_level == 'haut' else ''}
+- Insiste sur les aspects économiques, financiers et de gestion.
+- Mentionne les exigences réglementaires qui ont un impact sur le modèle économique.
+- Aborde les questions de conformité et de responsabilité juridique.
+- Évoque les aspects de management et d'organisation.
+        """,
+        
+        "coordinatrice": f"""Tu t'adresses à une coordinatrice qui supervise plusieurs structures et assure le lien entre terrain et gestion.
+- Fournis des informations complètes et détaillées.
+- Propose une vision globale et stratégique.
+- Mets en avant les aspects de coordination entre différents établissements.
+- Insiste sur les enjeux de qualité pédagogique et de cohérence des pratiques.
+- Aborde les aspects réglementaires en détail avec leurs implications concrètes.
+- Donne des pistes pour accompagner les équipes dans l'application des règles.
+        """
+    }
+    
+    # Instructions pour l'affichage des références
+    reference_instructions = {
+        "cap": "- Ne cite pas les références des sources, sauf si explicitement demandé.",
+        "directrice": "- Cite systématiquement les références précises des documents réglementaires.",
+        "gestionnaire": f"- {'Ne mentionne pas les références sauf si explicitement demandé.' if detail_level == 'bas' else 'Cite les principales références.' if detail_level == 'moyen' else 'Cite systématiquement les références précises des documents réglementaires.'}",
+        "coordinatrice": "- Cite systématiquement les références précises des documents réglementaires."
+    }
+    
+    # Construction des instructions finales
+    profile_specific = profile_instructions.get(profile, profile_instructions["directrice"])
+    reference_specific = reference_instructions.get(profile, "- Cite les références lorsque c'est pertinent.")
+    
+    return f"""Instructions pour adapter la réponse au profil {profile.upper()}:
+{profile_specific}
+{reference_specific}
+{common_instructions}
+"""
+
+def query_anthropic(query: str, context: str, profile: str, detail_level: str = "moyen") -> Dict[str, Any]:
     """Interroge l'API Anthropic Claude avec un contexte"""
     url = "https://api.anthropic.com/v1/messages"
     headers = {
@@ -105,16 +182,23 @@ def query_anthropic(query: str, context: str) -> Dict[str, Any]:
         "content-type": "application/json"
     }
     
-    # Construction du système prompt incluant le contexte
+    # Obtenir les instructions spécifiques au profil
+    profile_instructions = get_profile_instructions(profile, detail_level)
+    
+    # Construction du système prompt incluant le contexte et les instructions de profil
     system_prompt = f"""Tu es un assistant spécialisé dans les questions sur les crèches et l'accueil des jeunes enfants en France.
+Ton rôle est de fournir des informations précises sur la réglementation et le fonctionnement des établissements d'accueil du jeune enfant.
+
+{profile_instructions}
+
 Utilise les informations suivantes pour répondre aux questions de l'utilisateur:
 
 {context}
 
 Si tu ne trouves pas la réponse dans le contexte fourni, base-toi sur les connaissances générales que tu as sur les règlements des crèches en France.
-Réponds de manière concise et précise, en citant les sources réglementaires quand c'est pertinent."""
+Assure-toi que ta réponse est adaptée au profil de l'utilisateur, tant dans le contenu que dans la forme."""
     
-    logger.info(f"Envoi d'une requête à l'API Anthropic avec {len(context)} caractères de contexte")
+    logger.info(f"Envoi d'une requête à l'API Anthropic (profil: {profile}, niveau de détail: {detail_level})")
     
     payload = {
         "model": CLAUDE_MODEL,
@@ -158,6 +242,10 @@ def chat():
     """Point d'entrée API pour le chat"""
     data = request.json
     user_message = data.get('message', '')
+    user_profile = data.get('profile', 'directrice')  # Profil par défaut
+    detail_level = data.get('detailLevel', 'moyen')   # Niveau de détail par défaut
+    
+    logger.info(f"Nouvelle requête - Profil: {user_profile}, Niveau de détail: {detail_level}")
     
     if not user_message:
         return jsonify({"answer": "Désolé, je n'ai pas compris votre question."})
@@ -179,9 +267,9 @@ def chat():
     else:
         context = "Aucun document pertinent n'a été trouvé dans la base de connaissances."
     
-    # Interrogation de l'API Anthropic
+    # Interrogation de l'API Anthropic avec le profil utilisateur
     start_time = time.time()
-    api_response = query_anthropic(user_message, context)
+    api_response = query_anthropic(user_message, context, user_profile, detail_level)
     api_time = time.time() - start_time
     
     # Traitement de la réponse
