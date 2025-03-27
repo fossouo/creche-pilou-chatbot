@@ -96,6 +96,60 @@
             color: #888;
             margin-top: 5px;
         }
+        .profile-selector {
+            margin-bottom: 20px;
+            padding: 15px;
+            background-color: #f0f7ff;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .profile-button {
+            background-color: #fff;
+            color: #4a90e2;
+            border: 1px solid #4a90e2;
+            margin: 5px;
+            padding: 8px 15px;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .profile-button:hover, .profile-button.active {
+            background-color: #4a90e2;
+            color: white;
+        }
+        .profile-info {
+            margin-top: 10px;
+            font-size: 14px;
+            color: #666;
+        }
+        .detail-level {
+            display: none;
+            margin-top: 10px;
+        }
+        .detail-level.show {
+            display: block;
+        }
+        .detail-button {
+            background-color: #fff;
+            color: #4a90e2;
+            border: 1px solid #4a90e2;
+            margin: 5px;
+            padding: 5px 10px;
+            border-radius: 15px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .detail-button:hover, .detail-button.active {
+            background-color: #4a90e2;
+            color: white;
+        }
+        .references {
+            margin-top: 10px;
+            font-size: 13px;
+            color: #666;
+            border-top: 1px solid #eee;
+            padding-top: 8px;
+        }
     </style>
 </head>
 <body>
@@ -104,17 +158,36 @@
             <h1>Chatbot Crèche Pilou</h1>
             <p>Posez vos questions sur la réglementation et le fonctionnement des crèches</p>
         </header>
+
+        <div class="profile-selector">
+            <h3>Pour mieux vous répondre, choisissez votre profil :</h3>
+            <div>
+                <button class="profile-button" data-profile="cap">CAP Petite Enfance</button>
+                <button class="profile-button" data-profile="directrice">Directrice de crèche</button>
+                <button class="profile-button" data-profile="gestionnaire">Gestionnaire de réseau</button>
+                <button class="profile-button" data-profile="coordinatrice">Coordinatrice</button>
+            </div>
+            <div class="profile-info">
+                <span id="selected-profile">Aucun profil sélectionné</span>
+            </div>
+            <div class="detail-level" id="detail-selector">
+                <p>Niveau de détail souhaité :</p>
+                <button class="detail-button" data-detail="bas">Essentiel</button>
+                <button class="detail-button" data-detail="moyen">Standard</button>
+                <button class="detail-button" data-detail="haut">Détaillé</button>
+            </div>
+        </div>
         
         <div class="chat-container">
             <div class="chat-messages" id="chat-messages">
                 <div class="message bot-message">
-                    Bonjour ! Je suis le chatbot Crèche Pilou. Je peux répondre à vos questions sur la réglementation et le fonctionnement des crèches. Comment puis-je vous aider aujourd'hui ?
+                    Bonjour ! Je suis le chatbot Crèche Pilou. Je peux répondre à vos questions sur la réglementation et le fonctionnement des crèches. Veuillez d'abord sélectionner votre profil pour que je puisse adapter mes réponses.
                 </div>
             </div>
             
             <div class="chat-input">
-                <input type="text" id="user-input" placeholder="Posez votre question ici..." autocomplete="off">
-                <button id="send-button">Envoyer</button>
+                <input type="text" id="user-input" placeholder="Posez votre question ici..." autocomplete="off" disabled>
+                <button id="send-button" disabled>Envoyer</button>
             </div>
         </div>
     </div>
@@ -124,6 +197,51 @@
             const chatMessages = document.getElementById('chat-messages');
             const userInput = document.getElementById('user-input');
             const sendButton = document.getElementById('send-button');
+            const profileButtons = document.querySelectorAll('.profile-button');
+            const detailButtons = document.querySelectorAll('.detail-button');
+            const detailSelector = document.getElementById('detail-selector');
+            const selectedProfileInfo = document.getElementById('selected-profile');
+            
+            let userProfile = '';
+            let detailLevel = 'moyen'; // Par défaut
+
+            // Gestion des boutons de profil
+            profileButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    profileButtons.forEach(btn => btn.classList.remove('active'));
+                    button.classList.add('active');
+                    
+                    userProfile = button.getAttribute('data-profile');
+                    selectedProfileInfo.textContent = `Profil sélectionné : ${button.textContent}`;
+                    
+                    // Activer le champ de saisie et le bouton d'envoi
+                    userInput.disabled = false;
+                    sendButton.disabled = false;
+                    userInput.focus();
+                    
+                    // Afficher les options de niveau de détail pour les gestionnaires
+                    if (userProfile === 'gestionnaire') {
+                        detailSelector.classList.add('show');
+                        // Sélectionner le niveau moyen par défaut
+                        detailButtons.forEach(btn => {
+                            if (btn.getAttribute('data-detail') === 'moyen') {
+                                btn.classList.add('active');
+                            }
+                        });
+                    } else {
+                        detailSelector.classList.remove('show');
+                    }
+                });
+            });
+            
+            // Gestion des boutons de niveau de détail
+            detailButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    detailButtons.forEach(btn => btn.classList.remove('active'));
+                    button.classList.add('active');
+                    detailLevel = button.getAttribute('data-detail');
+                });
+            });
             
             // Fonction pour ajouter un message à la zone de chat
             function addMessage(message, isUser) {
@@ -139,8 +257,8 @@
                     
                     if (message.sources && message.sources.length > 0) {
                         const sourcesDiv = document.createElement('div');
-                        sourcesDiv.classList.add('sources');
-                        sourcesDiv.textContent = 'Sources: ' + message.sources.join(', ');
+                        sourcesDiv.classList.add('references');
+                        sourcesDiv.innerHTML = '<strong>Références:</strong> ' + message.sources.join(', ');
                         messageDiv.appendChild(sourcesDiv);
                     }
                 }
@@ -174,7 +292,11 @@
                         headers: {
                             'Content-Type': 'application/json'
                         },
-                        body: JSON.stringify({ message })
+                        body: JSON.stringify({ 
+                            message,
+                            profile: userProfile,
+                            detailLevel: detailLevel
+                        })
                     });
                     
                     const data = await response.json();
@@ -203,9 +325,6 @@
                     sendMessage();
                 }
             });
-            
-            // Focus sur le champ de texte au chargement de la page
-            userInput.focus();
         });
     </script>
 </body>
